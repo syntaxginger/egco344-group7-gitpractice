@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electricity Analysis - Pie Charts</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .back-button-container {
+            margin-bottom: 20px;
+        }
+        .back-button {
+            display: inline-block;
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        .back-button:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: translateX(-5px);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .filters {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 200px;
+        }
+        label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.95em;
+        }
+        select {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        select:hover {
+            border-color: #667eea;
+        }
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+        .chart-card {
+            background: #f7fafc;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .chart-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+        }
+        .chart-title {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            font-weight: 600;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+        .loading {
+            text-align: center;
+            color: #718096;
+            font-style: italic;
+        }
+        .error {
+            text-align: center;
+            color: #e53e3e;
+            font-weight: 500;
+        }
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="back-button-container">
+            <a href="index.html" class="back-button">← Back to Dashboard</a>
+        </div>
+        <h1>⚡ Electricity Analysis Dashboard</h1>
+        <p class="subtitle">Pie Charts - Usage and Users Distribution by Category</p>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label for="yearSelect">📅 Select Year</label>
+                <select id="yearSelect"></select>
+            </div>
+            <div class="filter-group">
+                <label for="provinceSelect">📍 Select Province</label>
+                <select id="provinceSelect"></select>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">💡 Electricity Usage by Category (kWh)</div>
+                <div class="chart-wrapper">
+                    <canvas id="usageChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">👥 Electricity Users by Category</div>
+                <div class="chart-wrapper">
+                    <canvas id="usersChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">📊 Usage Distribution (Top Categories)</div>
+                <div class="chart-wrapper">
+                    <canvas id="usagePercentageChart"></canvas>
+                </div>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🔌 Users Distribution (Top Categories)</div>
+                <div class="chart-wrapper">
+                    <canvas id="usersPercentageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let charts = {
+            usage: null,
+            users: null,
+            usagePercentage: null,
+            usersPercentage: null
+        };
+
+        const categories = [
+            { key: 'residential', label: 'Residential', color: '#FF6384' },
+            { key: 'small_business', label: 'Small Business', color: '#36A2EB' },
+            { key: 'medium_business', label: 'Medium Business', color: '#FFCE56' },
+            { key: 'large_business', label: 'Large Business', color: '#4BC0C0' },
+            { key: 'specialized_business', label: 'Specialized Business', color: '#9966FF' },
+            { key: 'backup_power', label: 'Backup Power', color: '#FF9F40' },
+            { key: 'interruptible_rate', label: 'Interruptible Rate', color: '#FF6384' },
+            { key: 'public_electricity', label: 'Public Electricity', color: '#C9CBCF' },
+            { key: 'government_state_enterprise', label: 'Government/State', color: '#4BC0C0' },
+            { key: 'water_pumping', label: 'Water Pumping', color: '#FF6384' },
+            { key: 'temporary_electricity', label: 'Temporary', color: '#36A2EB' },
+            { key: 'ev_charging', label: 'EV Charging', color: '#FFCE56' }
+        ];
+
+        let usagesData = [];
+        let usersData = [];
+
+        // Load data from JSON files
+        async function loadData() {
+            try {
+                const [usagesRes, usersRes] = await Promise.all([
+                    fetch('electricity_usages_en.json'),
+                    fetch('electricity_users_en.json')
+                ]);
+
+                const usagesJson = await usagesRes.json();
+                const usersJson = await usersRes.json();
+
+                // Handle nested structure in electricity_usages_en.json
+                if (usagesJson[0] && usagesJson[0].Sheet1) {
+                    usagesData = usagesJson[0].Sheet1;
+                } else if (Array.isArray(usagesJson)) {
+                    usagesData = usagesJson;
+                }
+
+                // Handle electricity_users_en.json
+                usersData = Array.isArray(usersJson) ? usersJson : (usersJson[0] && usersJson[0].Sheet1 ? usersJson[0].Sheet1 : []);
+
+                console.log('Usages Data:', usagesData);
+                console.log('Users Data:', usersData);
+
+                initializeFilters();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.querySelector('.charts-grid').innerHTML = '<div class="error">Error loading data. Please check console.</div>';
+            }
+        }
+
+        function initializeFilters() {
+            const years = [...new Set(usagesData.map(d => d.year))].sort((a, b) => b - a);
+            const provinces = [...new Set(usagesData.map(d => d.province_name))].sort();
+
+            const yearSelect = document.getElementById('yearSelect');
+            const provinceSelect = document.getElementById('provinceSelect');
+
+            yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            provinceSelect.innerHTML = provinces.map(p => `<option value="${p}">${p}</option>`).join('');
+
+            yearSelect.addEventListener('change', updateCharts);
+            provinceSelect.addEventListener('change', updateCharts);
+
+            updateCharts();
+        }
+
+        function updateCharts() {
+            const year = parseInt(document.getElementById('yearSelect').value);
+            const province = document.getElementById('provinceSelect').value;
+
+            const usageData = usagesData.find(d => d.year === year && d.province_name === province);
+            const userData = usersData.find(d => d.year === year && d.province_name === province);
+
+            if (usageData && userData) {
+                createUsageChart(usageData);
+                createUsersChart(userData);
+                createUsagePercentageChart(usageData);
+                createUsersPercentageChart(userData);
+            }
+        }
+
+        function createUsageChart(data) {
+            const labels = [];
+            const values = [];
+            const colors = [];
+
+            categories.forEach(cat => {
+                const value = data[`${cat.key}_kwh`];
+                if (value > 0) {
+                    labels.push(cat.label);
+                    values.push(value);
+                    colors.push(cat.color);
+                }
+            });
+
+            if (charts.usage) charts.usage.destroy();
+
+            const ctx = document.getElementById('usageChart').getContext('2d');
+            charts.usage = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 11 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${(value / 1000000).toFixed(2)}M kWh (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createUsersChart(data) {
+            const labels = [];
+            const values = [];
+            const colors = [];
+
+            categories.forEach(cat => {
+                const value = data[`${cat.key}_count`];
+                if (value > 0) {
+                    labels.push(cat.label);
+                    values.push(value);
+                    colors.push(cat.color);
+                }
+            });
+
+            if (charts.users) charts.users.destroy();
+
+            const ctx = document.getElementById('usersChart').getContext('2d');
+            charts.users = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 11 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${value.toLocaleString()} users (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createUsagePercentageChart(data) {
+            const dataArray = [];
+            categories.forEach(cat => {
+                const value = data[`${cat.key}_kwh`];
+                if (value > 0) {
+                    dataArray.push({ label: cat.label, value: value, color: cat.color });
+                }
+            });
+
+            // Sort by value and take top 8
+            dataArray.sort((a, b) => b.value - a.value);
+            const topData = dataArray.slice(0, 8);
+
+            // Add "Others" if there are more
+            if (dataArray.length > 8) {
+                const othersValue = dataArray.slice(8).reduce((sum, item) => sum + item.value, 0);
+                topData.push({ label: 'Others', value: othersValue, color: '#E2E8F0' });
+            }
+
+            if (charts.usagePercentage) charts.usagePercentage.destroy();
+
+            const ctx = document.getElementById('usagePercentageChart').getContext('2d');
+            charts.usagePercentage = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: topData.map(d => d.label),
+                    datasets: [{
+                        data: topData.map(d => d.value),
+                        backgroundColor: topData.map(d => d.color),
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 10 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${percentage}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createUsersPercentageChart(data) {
+            const dataArray = [];
+            categories.forEach(cat => {
+                const value = data[`${cat.key}_count`];
+                if (value > 0) {
+                    dataArray.push({ label: cat.label, value: value, color: cat.color });
+                }
+            });
+
+            // Sort by value and take top 8
+            dataArray.sort((a, b) => b.value - a.value);
+            const topData = dataArray.slice(0, 8);
+
+            // Add "Others" if there are more
+            if (dataArray.length > 8) {
+                const othersValue = dataArray.slice(8).reduce((sum, item) => sum + item.value, 0);
+                topData.push({ label: 'Others', value: othersValue, color: '#E2E8F0' });
+            }
+
+            if (charts.usersPercentage) charts.usersPercentage.destroy();
+
+            const ctx = document.getElementById('usersPercentageChart').getContext('2d');
+            charts.usersPercentage = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: topData.map(d => d.label),
+                    datasets: [{
+                        data: topData.map(d => d.value),
+                        backgroundColor: topData.map(d => d.color),
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                font: { size: 10 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return `${label}: ${percentage}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize on page load
+        loadData();
+    </script>
+</body>
+</html>
